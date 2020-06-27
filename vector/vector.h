@@ -15,15 +15,11 @@ struct vector
   typedef T const* const_iterator;
 
   // O(1) nothrow
-  vector() {
-    data_ = nullptr;
-    capacity_ = 0;
-    size_ = 0;
-  }
+  vector() : data_(nullptr), capacity_(0), size_(0) {}
 
   // O(N) strong
   vector(vector const& other) : vector() {
-    copy_all(*this, other, other.size_);
+    copy_all(other, other.size_);
   }
 
   // O(N) strong
@@ -35,9 +31,7 @@ struct vector
 
   // O(N) nothrow
   ~vector() {
-    for (size_t i = 0; i < size_; i++) {
-      data_[i].~T();
-    }
+    clear();
     operator delete (data_);
   }
 
@@ -89,7 +83,8 @@ struct vector
     if (size_ == capacity_) {
       push_back_realloc(a);
     } else {
-      new(data_ + size_++) T(a);
+      new(data_ + size_) T(a);
+      size_++;
     }
   }
 
@@ -110,23 +105,25 @@ struct vector
 
   // O(N) strong
   void reserve(size_t new_capacity) {
-    if (new_capacity < capacity_) return;
-    vector tmp = vector();
-    copy_all(tmp, *this, (std::max(new_capacity, (size_t)1)));
-    swap(tmp);
+    if (new_capacity < capacity_) {
+      return;
+    }
+    copy_all(*this, new_capacity);
   }
 
   // O(N) strong
   void shrink_to_fit() {
-    if (size_ == capacity_) return;
+    if (size_ == capacity_) {
+      return;
+    }
     vector tmp(*this);
     swap(tmp);
   }
 
   // O(N) nothrow
   void clear() {
-    for(int i = size_ - 1; i >= 0; i--) {
-      data_[i].~T();
+    for(size_t i = size_; i > 0; i--) {
+      data_[i - 1].~T();
     }
 
     size_ = 0;
@@ -174,13 +171,7 @@ struct vector
 
   // O(N) weak
   iterator erase(const_iterator pos) {
-    size_t p = pos - begin();
-    for (size_t i = p; i < size_ - 1; i++) {
-      std::swap(data_[i],  data_[i + 1]);
-    }
-    pop_back();
-
-    return data_ + p;
+    erase(pos, pos + 1);
   }
 
   // O(N) weak
@@ -190,7 +181,7 @@ struct vector
     for (size_t i = first - begin(); i < size_ - erase_size; i++) {
       data_[i] = data_[i + erase_size];
     }
-    for (int i = 0; i < erase_size; i++) {
+    for (size_t i = 0; i < erase_size; i++) {
       pop_back();
     }
 
@@ -199,20 +190,23 @@ struct vector
 
  private:
   size_t increase_capacity() const {
-    return 2 * capacity_;
-  }
-  void push_back_realloc(T const& a) {
-    T tmp(a);
-    reserve(increase_capacity());
-    new(data_ + size_++) T(tmp);
+    return std::max(2 * capacity_, (size_t)1);
   }
 
   static T* new_buffer(size_t new_capacity) {
     return new_capacity == 0 ? nullptr : static_cast<T*>(operator new (new_capacity * sizeof(T)));
   }
 
+  void push_back_realloc(T const& a) {
+    T tmp(a);
+    reserve(increase_capacity());
+
+    new(data_ + size_) T(tmp);
+    size_++;
+  }
+
   // O(n) strong
-  static void copy_all(vector &cur, vector const& other, size_t new_capacity) {
+  void copy_all(vector const& other, size_t new_capacity) {
     T *new_data = new_buffer(new_capacity);
     size_t i;
 
@@ -221,12 +215,16 @@ struct vector
         new(new_data + i) T(other.data_[i]);
       }
 
-      cur.~vector();
-      cur.data_ = new_data;
-      cur.size_ = other.size_;
-      cur.capacity_ = new_capacity;
+      for(i = size_; i > 0; i--) {
+        data_[i - 1].~T();
+      }
+      operator delete(data_);
+
+      data_ = new_data;
+      size_ = other.size_;
+      capacity_ = new_capacity;
     } catch (...) {
-      for ( ; i != 0; i--) {
+      for ( ; i > 0; i--) {
         new_data[i - 1].~T();
       }
 
