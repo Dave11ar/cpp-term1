@@ -171,7 +171,7 @@ struct vector
 
   // O(N) weak
   iterator erase(const_iterator pos) {
-    erase(pos, pos + 1);
+    return erase(pos, pos + 1);
   }
 
   // O(N) weak
