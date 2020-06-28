@@ -15,7 +15,7 @@ struct vector
   typedef T const* const_iterator;
 
   // O(1) nothrow
-  vector() : data_(nullptr), capacity_(0), size_(0) {}
+  vector() : data_(nullptr), size_(0), capacity_(0) {}
 
   // O(N) strong
   vector(vector const& other) : vector() {
@@ -105,7 +105,7 @@ struct vector
 
   // O(N) strong
   void reserve(size_t new_capacity) {
-    if (new_capacity < capacity_) {
+    if (new_capacity <= capacity_) {
       return;
     }
     copy_all(*this, new_capacity);
@@ -122,10 +122,7 @@ struct vector
 
   // O(N) nothrow
   void clear() {
-    for(size_t i = size_; i > 0; i--) {
-      data_[i - 1].~T();
-    }
-
+    destroy_all();
     size_ = 0;
   }
 
@@ -176,13 +173,14 @@ struct vector
 
   // O(N) weak
   iterator erase(const_iterator first, const_iterator last) {
-    size_t erase_size = last - first;
-
-    for (size_t i = first - begin(); i < size_ - erase_size; i++) {
-      data_[i] = data_[i + erase_size];
-    }
-    for (size_t i = 0; i < erase_size; i++) {
-      pop_back();
+    ptrdiff_t erase_size = last - first;
+    if (erase_size != 0) {
+      for (ptrdiff_t i = first - begin(); i < size_ - erase_size; i++) {
+        data_[i] = data_[i + erase_size];
+      }
+      for (ptrdiff_t i = 0; i < erase_size; i++) {
+        pop_back();
+      }
     }
 
     return (first - begin()) + begin();
@@ -190,7 +188,7 @@ struct vector
 
  private:
   size_t increase_capacity() const {
-    return std::max(2 * capacity_, (size_t)1);
+    return capacity_ == 0 ? 1 : 2 * capacity_;
   }
 
   static T* new_buffer(size_t new_capacity) {
@@ -205,6 +203,12 @@ struct vector
     size_++;
   }
 
+  void destroy_all() {
+    for(size_t i = size_; i > 0; i--) {
+      data_[i - 1].~T();
+    }
+  }
+
   // O(n) strong
   void copy_all(vector const& other, size_t new_capacity) {
     T *new_data = new_buffer(new_capacity);
@@ -214,15 +218,6 @@ struct vector
       for (i = 0; i < other.size_; i++) {
         new(new_data + i) T(other.data_[i]);
       }
-
-      for(i = size_; i > 0; i--) {
-        data_[i - 1].~T();
-      }
-      operator delete(data_);
-
-      data_ = new_data;
-      size_ = other.size_;
-      capacity_ = new_capacity;
     } catch (...) {
       for ( ; i > 0; i--) {
         new_data[i - 1].~T();
@@ -231,12 +226,19 @@ struct vector
       operator delete(new_data);
       throw;
     }
+
+    destroy_all();
+    operator delete(data_);
+
+    data_ = new_data;
+    size_ = other.size_;
+    capacity_ = new_capacity;
   }
 
  private:
   T* data_;
-  size_t size_{};
-  size_t capacity_{};
+  size_t size_;
+  size_t capacity_;
 };
 
 #endif // VECTOR_H
