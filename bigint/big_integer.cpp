@@ -4,6 +4,7 @@
 
 #include "big_integer.h"
 #include <algorithm>
+__extension__ typedef __int128 uint128_t;
 
 big_integer::big_integer() : sign(false), value(1) {}
 
@@ -178,13 +179,13 @@ void big_integer::short_div(big_integer &a, uint32_t b) {
 }
 
 uint32_t big_integer::trial(big_integer const &a, big_integer const &b) {
-  __int128 dividend = ((static_cast<__int128>(a.value[a.value.size() - 1]) << 64) |
-      (static_cast<__int128>(a.value[a.value.size() - 2]) << 32) |
-      (static_cast<__int128>(a.value[a.value.size() - 3])));
-  __int128 divider = ((static_cast<__int128>(b.value[b.value.size() - 1]) << 32) |
-      (static_cast<__int128>(b.value[b.value.size() - 2])));
+  uint128_t dividend = ((static_cast<uint128_t>(a.value[a.value.size() - 1]) << 64) |
+      (static_cast<uint128_t>(a.value[a.value.size() - 2]) << 32) |
+      (static_cast<uint128_t>(a.value[a.value.size() - 3])));
+  uint128_t divider = ((static_cast<uint128_t>(b.value[b.value.size() - 1]) << 32) |
+      (static_cast<uint128_t>(b.value[b.value.size() - 2])));
 
-  return std::min(dividend / divider, static_cast<__int128>(UINT32_MAX));
+  return std::min(dividend / divider, static_cast<uint128_t>(UINT32_MAX));
 }
 
 bool big_integer::smaller(big_integer const &a, big_integer const &b, size_t m) {
