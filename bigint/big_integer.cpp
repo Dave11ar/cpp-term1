@@ -184,7 +184,7 @@ uint32_t big_integer::trial(big_integer const &a, big_integer const &b) {
   __int128 divider = ((static_cast<__int128>(b.value[b.value.size() - 1]) << 32) |
       (static_cast<__int128>(b.value[b.value.size() - 2])));
 
-  return dividend / divider;
+  return std::min(dividend / divider, static_cast<__int128>(UINT32_MAX));
 }
 
 bool big_integer::smaller(big_integer const &a, big_integer const &b, size_t m) {
@@ -210,7 +210,7 @@ void big_integer::difference(big_integer &a, big_integer const &b, size_t m) {
 
 big_integer::big_integer(uint32_t a) : sign(false), value({a}) {}
 
-big_integer operator/(big_integer a, big_integer const &b) {
+big_integer operator/(big_integer a, big_integer const& b) {
   bool ans_sign = a.sign ^ b.sign;
   a.sign = b.sign;
   if (!b.sign) {
@@ -225,25 +225,26 @@ big_integer operator/(big_integer a, big_integer const &b) {
     return a;
   }
 
+  uint32_t normalize = (static_cast<uint64_t>(UINT32_MAX) + 1) / (static_cast<uint64_t>(b.value.back()) + 1);
+  a *= normalize;
+  big_integer divisor = b * normalize;
   a.value.push_back(0);
-  size_t m = b.value.size() + 1;
+  size_t m = divisor.value.size() + 1;
   big_integer ans, dq;
-  ans.value.resize(a.value.size() - b.value.size());
+  ans.value.resize(a.value.size() - divisor.value.size());
   uint32_t qt = 0;
 
   for (size_t j = ans.value.size(); j != 0; j--) {
-    qt = big_integer::trial(a, b);
-    dq = b * qt;
+    qt = big_integer::trial(a, divisor);
+    dq = divisor * qt;
 
     if (big_integer::smaller(a, dq, m)) {
       qt--;
-      dq -= b;
+      dq -= divisor;
     }
     ans.value[j - 1] = qt;
     big_integer::difference(a, dq, m);
-    if (!a.value.back()) {
-      a.value.pop_back();
-    }
+    a.remove_zero();
   }
 
   ans.remove_zero();
@@ -314,6 +315,7 @@ big_integer operator<<(big_integer a, int b) {
 
   return a;
 }
+
 big_integer operator>>(big_integer a, int b) {
   if (b < 0) return a << (-b);
 
