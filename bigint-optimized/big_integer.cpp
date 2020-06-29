@@ -304,9 +304,7 @@ big_integer operator/(big_integer a, big_integer const& b) {
     ans.get_elem(j - 1) = qt;
 
     big_integer::difference(a, dq, m);
-    if (!a.shared->data.back()) {
-      a.shared->data.pop_back();
-    }
+    a.shared->data.pop_back();
   }
 
   ans.remove_zero();
