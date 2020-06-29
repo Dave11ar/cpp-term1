@@ -12,7 +12,6 @@ struct big_integer {
   big_integer();
   big_integer(big_integer const& value);
   big_integer(int value);
-  big_integer(uint32_t value);
   explicit big_integer(std::string const& str);
   ~big_integer();
 
@@ -66,6 +65,7 @@ struct big_integer {
   bool sign{};
   std::vector<uint32_t> value;
 
+  big_integer(uint32_t value);
   void remove_zero();
   static void short_div(big_integer &a, uint32_t b);
   static uint32_t trial(big_integer const &a, big_integer const &b);
