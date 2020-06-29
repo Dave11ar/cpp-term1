@@ -17,9 +17,7 @@ big_integer::big_integer(uint32_t val, size_t n) : sign(false) {
 
 big_integer::big_integer(big_integer const &a) : sign(a.sign) {
   shared = a.shared;
-  if (shared != NULL) {
-    shared->ref_counter++;
-  }
+  shared->ref_counter++;
 }
 
 big_integer::big_integer(int a) : sign(a < 0) {
@@ -35,7 +33,7 @@ big_integer::big_integer(std::string const &str) : big_integer() {
     return;
   }
 
-  for (size_t digit = (str[0] == '-' || str[0] == '+') ? 1 : 0; digit < str.length(); digit++) {
+  for (size_t digit = (str[0] == '-' || str[0] == '+'); digit < str.length(); digit++) {
     *this *= 10;
     *this += (str[digit] - '0');
   }
@@ -45,14 +43,10 @@ big_integer::big_integer(std::string const &str) : big_integer() {
 }
 
 big_integer::~big_integer() {
-  if (shared == NULL) {
-    return;
-  }
   shared->ref_counter--;
 
   if (shared->ref_counter == 0) {
     delete shared;
-    shared = NULL;
   }
 }
 
@@ -61,18 +55,15 @@ big_integer& big_integer::operator=(big_integer const &a) {
     return *this;
   }
 
-  if (shared != NULL && shared->ref_counter == 1) {
+  if (shared->ref_counter == 1) {
     delete shared;
-    shared = NULL;
-  }
-  if (shared != NULL) {
+  } else {
     shared->ref_counter--;
   }
   sign = a.sign;
   shared = a.shared;
-  if (a.shared != NULL) {
-    shared->ref_counter++;
-  }
+  shared->ref_counter++;
+
   return *this;
 }
 
@@ -121,7 +112,7 @@ big_integer big_integer::operator+() const {
 }
 
 big_integer big_integer::operator-() const {
-  if (size() == 1 && get_elem(0) == 0) {
+  if (size() == 1 && !get_elem(0)) {
     return *this;
   }
 
@@ -205,7 +196,7 @@ big_integer operator-(big_integer const& a, big_integer const& b) {
   for (size_t i = 0; i < ans.size(); i++) {
     tmp = (int64_t) ans.get_elem(i) - carry - (i < b.size() ? b.get_elem(i) : 0);
     carry = tmp < 0;
-    ans.get_elem(i) = tmp < 0 ? (uint32_t) (tmp + 1 + UINT32_MAX) : tmp;
+    ans.get_elem(i) = tmp < 0 ? static_cast<uint32_t>(tmp + 1 + UINT32_MAX) : tmp;
   }
   ans.remove_zero();
 
@@ -223,7 +214,7 @@ big_integer operator*(big_integer const& a, big_integer const& b){
     uint64_t carry = 0;
     for (size_t j = 0; j < b.size(); j++) {
       uint64_t tmp = (uint64_t) a.get_elem(i) * b.get_elem(j) + carry + res.get_elem(i + j);
-      res.get_elem(i + j) = (uint32_t)(tmp & UINT32_MAX);
+      res.get_elem(i + j) = static_cast<uint32_t>(tmp & UINT32_MAX);
       carry = tmp >> 32;
     }
     res.get_elem(i + b.size()) += carry;
@@ -243,11 +234,11 @@ void big_integer::short_div(big_integer& a, uint32_t b) {
 }
 
 uint32_t big_integer::trial(big_integer const& a, big_integer const& b) {
-  uint128_t dividend = (((uint128_t) a.get_elem(a.size() - 1) << 64) |
-      ((uint128_t) a.get_elem(a.size() - 2) << 32) |
-      ((uint128_t) a.get_elem(a.size() - 3)));
-  uint128_t divider = (((uint128_t) b.get_elem(b.size() - 1) << 32) |
-      ((uint128_t) b.get_elem(b.size() - 2)));
+  uint128_t dividend = ((static_cast<uint128_t>(a.get_elem(a.size() - 1)) << 64) |
+      (static_cast<uint128_t>(a.get_elem(a.size() - 2)) << 32) |
+      (static_cast<uint128_t>(a.get_elem(a.size() - 3))));
+  uint128_t divider = ((static_cast<uint128_t>(b.get_elem(b.size() - 1)) << 32) |
+      (static_cast<uint128_t>(b.get_elem(b.size() - 2))));
 
   return static_cast<uint32_t>((dividend / divider) & UINT32_MAX);
 }
@@ -267,8 +258,8 @@ void big_integer::difference(big_integer &a, big_integer const &b, size_t m) {
   int64_t borrow = 0;
   uint64_t start = a.size() - m;
   for (size_t i = 0; i < m; i++) {
-    int64_t diff = (int64_t) a.get_elem(start + i) - (i < b.size() ? b.get_elem(i) : 0) - borrow;
-    a.get_elem(start + i) = (diff < 0 ? (uint32_t)(diff + 1 + UINT32_MAX) : diff);
+    int64_t diff = static_cast<int64_t>(a.get_elem(start + i)) - (i < b.size() ? b.get_elem(i) : 0) - borrow;
+    a.get_elem(start + i) = (diff < 0 ? static_cast<uint32_t>(diff + 1 + UINT32_MAX) : diff);
     borrow = diff < 0;
   }
 }
@@ -280,12 +271,10 @@ big_integer operator/(big_integer a, big_integer const& b) {
   a.sign = b.sign;
   if (!b.sign) {
     if (b > a) {
-      a.~big_integer();
       return 0;
     }
   } else {
     if (b < a)  {
-      a.~big_integer();
       return 0;
     }
   }
@@ -313,6 +302,7 @@ big_integer operator/(big_integer a, big_integer const& b) {
       dq -= divider;
     }
     ans.get_elem(j - 1) = qt;
+
     big_integer::difference(a, dq, m);
     if (!a.shared->data.back()) {
       a.shared->data.pop_back();
@@ -368,7 +358,6 @@ big_integer big_integer::binary_operation(big_integer const& a, big_integer cons
     fir.remove_zero();
   }
   fir.sign = new_sign;
-  sec.~big_integer();
 
   return fir;
 }

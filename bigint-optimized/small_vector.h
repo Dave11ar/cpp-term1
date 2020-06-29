@@ -31,7 +31,9 @@ struct small_vector {
   }
 
   ~small_vector() {
-    if (!small) delete vec;
+    if (!small) {
+      delete vec;
+    }
   }
 
   T& operator[](size_t i){
@@ -67,9 +69,9 @@ struct small_vector {
   }
 
   void reverse() {
-    if (small) return;
-
-    std::reverse(vec->begin(), vec->end());
+    if (!small) {
+      std::reverse(vec->begin(), vec->end());
+    }
   }
 
   size_t size() {
@@ -77,7 +79,9 @@ struct small_vector {
   }
 
   bool operator==(small_vector const &a) {
-    if (small != a.small) return false;
+    if (small != a.small) {
+      return false;
+    }
 
     return small ? num == a.num : *vec == *a.vec;
   }
