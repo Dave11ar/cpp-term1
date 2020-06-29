@@ -2,7 +2,7 @@
 
                 global          _start
 _start:
-                sub             rsp, 4 * 128 * 8 + 129 * 8
+                sub             rsp, 4 * 128 * 8
                 lea             rdi, [rsp]
                 mov             rcx, 128
                 call            read_long
@@ -11,14 +11,10 @@ _start:
                 lea             rsi, [rsp + 128 * 8]
                 mov             rdi, rsp
                 lea             r8, [rsi + 128 * 8]
-                mov             r10, rcx
-                lea             r9, [r8 + 128 * 8 * 2]
-                ;   r8 --- adress of mul result, size = 2 * long
-                ;   r10 --- second counter to long length
-                ;   r9 --- buffer for mul_long_short
+
                 call            mul_long_long
                 mov             rdi, r8
-                lea             rcx, [128 * 2] 
+                shl             rcx, 1
                 call            write_long
 
                 mov             al, 0x0a
@@ -33,8 +29,6 @@ _start:
 ; result:
 ;    sum is written to rdi
 add_long_long:
-                push            rdi
-                push            rsi
                 push            rcx
 
                 add             rcx, 1
@@ -48,8 +42,6 @@ add_long_long:
                 jnz             .loop
 
                 pop             rcx
-                pop             rsi
-                pop             rdi
                 ret
 
 ; adds 64-bit number to long number
@@ -83,7 +75,7 @@ add_long_short:
 ;    rbx -- multiplier #2 (64-bit unsigned)
 ;    rcx -- length of long number in qwords
 ; result:
-;    product is written to r9
+;    product is written to r9 which contains rcx + 1 qwords
 mul_long_short:
                 push            rax
                 push            rdi
@@ -114,38 +106,51 @@ mul_long_short:
                 ret
                 
 ; multiplies long number by a long
-;    rdi -- address of multiplier #1 (long number)
-;    rsi -- address of multiplier #2 (long number)
-;    r10 -- length of long number in qwords
+;    rdi -- address of multiplier #1 (128 qwords)
+;    rsi -- address of multiplier #2 (128 qwords)
+;    rcx -- length of number in qwords (128 qword)
+;    r9 --- buffer for mul_long_short
 ; result:
-;    product is written to r8
+;    product is written to r8 (256 qwords)
+
 mul_long_long:
-                push            rax
-                push            rdi
-                push            r10
+                push            rcx
                 push            r8
+                
+                mov             rbp, rsp
+                sub             rsp, 129 * 8
+                mov             r9, rsp
 .loop:
                 mov             rbx, [rsi]
+                
+                push            rcx
+                mov             rcx, 128
                 call            mul_long_short
+                pop             rcx
                 
                 push            rdi
                 push            rsi
                 mov             rsi, r9
                 mov             rdi, r8
+                
+                push            rcx
+                mov             rcx, 128
                 call            add_long_long
+                pop             rcx
+                
                 pop             rsi
                 pop             rdi
                 
                 add             r8, 8
                 
                 add             rsi, 8
-                dec             r10
+                dec             rcx
                 jnz             .loop
 
+                mov             rsp, rbp
+                
                 pop             r8
-                pop             r10
-                pop             rdi
-                pop             rax
+                pop             rcx
                 ret
 
 ; divides long number by a short
