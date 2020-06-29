@@ -5,8 +5,6 @@
 #include "big_integer.h"
 #include <algorithm>
 
-__extension__ typedef unsigned __int128 uint128_t;
-
 big_integer::big_integer() : sign(false), value(1) {}
 
 big_integer::big_integer(big_integer const &a) = default;
@@ -197,11 +195,11 @@ void big_integer::short_div(big_integer &a, uint32_t b) {
 }
 
 uint32_t big_integer::trial(big_integer const &a, big_integer const &b) {
-  uint128_t dividend = ((static_cast<uint128_t>(a.value[a.value.size() - 1]) << 64) |
-      (static_cast<uint128_t>(a.value[a.value.size() - 2]) << 32) |
-      (static_cast<uint128_t>(a.value[a.value.size() - 3])));
-  uint128_t divider = ((static_cast<uint128_t>(b.value[b.value.size() - 1]) << 32) |
-      (static_cast<uint128_t>(b.value[b.value.size() - 2])));
+  __uint128_t dividend = ((static_cast<__uint128_t>(a.value[a.value.size() - 1]) << 64) |
+      (static_cast<__uint128_t>(a.value[a.value.size() - 2]) << 32) |
+      (static_cast<__uint128_t>(a.value[a.value.size() - 3])));
+  __uint128_t divider = ((static_cast<__uint128_t>(b.value[b.value.size() - 1]) << 32) |
+      (static_cast<__uint128_t>(b.value[b.value.size() - 2])));
 
   return static_cast<uint32_t>((dividend / divider) & UINT32_MAX);
 }
