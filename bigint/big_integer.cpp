@@ -4,7 +4,7 @@
 
 #include "big_integer.h"
 #include <algorithm>
-__extension__ typedef __int128 uint128_t;
+__extension__ typedef unsigned __int128 uint128_t;
 
 big_integer::big_integer() : sign(false), value(1) {}
 
@@ -245,7 +245,9 @@ big_integer operator/(big_integer a, big_integer const& b) {
     }
     ans.value[j - 1] = qt;
     big_integer::difference(a, dq, m);
-    a.remove_zero();
+    if (!a.value.back()) {
+      a.value.pop_back();
+    }
   }
 
   ans.remove_zero();
