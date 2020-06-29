@@ -261,9 +261,7 @@ big_integer operator/(big_integer a, big_integer const& b) {
     }
     ans.value[j - 1] = qt;
     big_integer::difference(a, dq, m);
-    if (!a.value.back()) {
-      a.value.pop_back();
-    }
+    a.value.pop_back();
   }
 
   ans.remove_zero();
