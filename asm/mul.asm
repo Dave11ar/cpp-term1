@@ -23,11 +23,11 @@ _start:
                 jmp             exit
 
 ; adds two long number
-;    rdi -- address of summand #1 (long number)
-;    rsi -- address of summand #2 (long number)
+;    rdi -- address of summand #1 (128 qwords)
+;    rsi -- address of summand #2 (128 qwords)
 ;    rcx -- length of long numbers in qwords
 ; result:
-;    sum is written to rdi
+;    sum is written to rdi (rcx + 1 qwords)
 add_long_long:
                 push            rcx
 
@@ -104,27 +104,30 @@ mul_long_short:
                 pop             rdi
                 pop             rax
                 ret
-                
+
 ; multiplies long number by a long
 ;    rdi -- address of multiplier #1 (128 qwords)
 ;    rsi -- address of multiplier #2 (128 qwords)
 ;    rcx -- length of number in qwords (128 qword)
-;    r9 --- buffer for mul_long_short
+;    r9 --- buffer for mul_long_short (rcx + 1 qwords)
 ; result:
 ;    product is written to r8 (256 qwords)
 
 mul_long_long:
-                push            rcx
                 push            r8
+                push            rcx
                 
                 mov             rbp, rsp
-                sub             rsp, 129 * 8
+                lea             r10, [(rcx + 1) * 8]
+                sub             rsp, r10
                 mov             r9, rsp
+                
+                mov             r10, rcx
 .loop:
                 mov             rbx, [rsi]
                 
                 push            rcx
-                mov             rcx, 128
+                mov             rcx, r10
                 call            mul_long_short
                 pop             rcx
                 
@@ -134,7 +137,7 @@ mul_long_long:
                 mov             rdi, r8
                 
                 push            rcx
-                mov             rcx, 128
+                mov             rcx, r10
                 call            add_long_long
                 pop             rcx
                 
@@ -149,8 +152,8 @@ mul_long_long:
 
                 mov             rsp, rbp
                 
-                pop             r8
                 pop             rcx
+                pop             r8
                 ret
 
 ; divides long number by a short
