@@ -53,18 +53,18 @@ struct big_integer {
   big_integer& operator--();
   big_integer operator--(int);
 
-  friend big_integer operator+(big_integer const& a, big_integer const& b);
-  friend big_integer operator-(big_integer const& a, big_integer const& b);
+  friend big_integer operator+(big_integer a, big_integer const& b);
+  friend big_integer operator-(big_integer a, big_integer const& b);
   friend big_integer operator/(big_integer a, big_integer const& b);
-  friend big_integer operator*(big_integer const& a, big_integer const& b);
-  friend big_integer operator%(big_integer const& a, big_integer const& b);
+  friend big_integer operator*(big_integer a, big_integer const& b);
+  friend big_integer operator%(big_integer a, big_integer const& b);
 
-  friend big_integer operator&(big_integer const& a, big_integer const& b);
-  friend big_integer operator|(big_integer const& a, big_integer const& b);
-  friend big_integer operator^(big_integer const& a, big_integer const& b);
+  friend big_integer operator&(big_integer a, big_integer const& b);
+  friend big_integer operator|(big_integer a, big_integer const& b);
+  friend big_integer operator^(big_integer a, big_integer const& b);
 
-  friend big_integer operator<<(big_integer const& a, int b);
-  friend big_integer operator>>(big_integer const& a, int b);
+  friend big_integer operator<<(big_integer a, int b);
+  friend big_integer operator>>(big_integer a, int b);
 
   friend bool operator==(big_integer const& a, big_integer const& b);
   friend bool operator!=(big_integer const& a, big_integer const& b);
@@ -88,12 +88,12 @@ struct big_integer {
   void remove_zero();
   void unshare();
 
-  static void short_div(big_integer &a, uint32_t b);
-  static uint32_t trial(big_integer const &a, big_integer const &b);
-  static bool smaller(big_integer const &a, big_integer const &b, size_t m);
-  static void difference(big_integer &a, big_integer const &b, size_t m);
-  static void additional_code(big_integer &a);
-  static big_integer binary_operation(big_integer const& a, big_integer const& b, uint32_t (*func)(uint32_t, uint32_t));
+  void short_div(uint32_t b);
+  uint32_t trial(big_integer const &b);
+  bool smaller(big_integer const &b, size_t m);
+  void difference(big_integer const &b, size_t m);
+  void additional_code();
+  big_integer binary_operation(big_integer const& b, uint32_t (*func)(uint32_t, uint32_t));
 };
 
 std::string to_string(big_integer const& a);
