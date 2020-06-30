@@ -9,8 +9,9 @@ big_integer::big_integer() : sign(false), value(1) {}
 
 big_integer::big_integer(big_integer const &a) = default;
 
-big_integer::big_integer(int a) :
-  sign(a < 0), value({a < 0 ? static_cast<uint32_t>(-static_cast<int64_t>(a)) : static_cast<uint32_t>(a)}) {}
+big_integer::big_integer(int a) : sign(a < 0) {
+  value =  {static_cast<uint32_t>(a < 0 ? -static_cast<int64_t>(a) : a)};
+}
 
 big_integer::big_integer(uint32_t a) : sign(false), value({a}) {}
 
@@ -121,7 +122,9 @@ big_integer operator+(big_integer a, big_integer const& b) {
       carry = tmp > UINT32_MAX;
       a.value[i] = static_cast<uint32_t>(tmp & UINT32_MAX);
     }
-    if (carry > 0) a.value.push_back(carry);
+    if (carry > 0) {
+      a.value.push_back(carry);
+    }
 
     return a;
   } else {
@@ -184,29 +187,27 @@ big_integer operator*(big_integer const& a, big_integer const& b){
 }
 
 
-void big_integer::short_div(big_integer &a, uint32_t b) {
+void big_integer::short_div(uint32_t b) {
   uint64_t carry = 0;
-  for (size_t i = a.value.size(); i != 0; i--) {
-    uint64_t tmp = (carry << 32) + a.value[i - 1];
-    a.value[i - 1] = tmp / b;
+  for (size_t i = value.size(); i != 0; i--) {
+    uint64_t tmp = (carry << 32) + value[i - 1];
+    value[i - 1] = tmp / b;
     carry = tmp % b;
   }
-  a.remove_zero();
+  remove_zero();
 }
 
-uint32_t big_integer::trial(big_integer const &a, big_integer const &b) {
-  __uint128_t dividend = ((static_cast<__uint128_t>(a.value[a.value.size() - 1]) << 64) |
-      (static_cast<__uint128_t>(a.value[a.value.size() - 2]) << 32) |
-      (static_cast<__uint128_t>(a.value[a.value.size() - 3])));
-  __uint128_t divider = ((static_cast<__uint128_t>(b.value[b.value.size() - 1]) << 32) |
-      (static_cast<__uint128_t>(b.value[b.value.size() - 2])));
+uint32_t big_integer::trial(big_integer const &b) {
+  uint64_t dividend = (static_cast<uint64_t>(value.back()) << 32) |
+      (static_cast<uint64_t>(value[value.size() - 2]));
+  uint64_t divider = static_cast<uint64_t>(b.value.back());
 
   return static_cast<uint32_t>((dividend / divider) & UINT32_MAX);
 }
 
-bool big_integer::smaller(big_integer const &a, big_integer const &b, size_t m) {
-  for (size_t i = 1; i <= a.value.size(); i++) {
-    uint32_t x = a.value[a.value.size() - i];
+bool big_integer::smaller(big_integer const &b, size_t m) {
+  for (size_t i = 1; i <= value.size(); i++) {
+    uint32_t x = value[value.size() - i];
     uint32_t y = (m - i < b.value.size() ? b.value[m - i] : 0);
     if (x != y) {
       return x < y;
@@ -215,12 +216,12 @@ bool big_integer::smaller(big_integer const &a, big_integer const &b, size_t m) 
   return false;
 }
 
-void big_integer::difference(big_integer &a, big_integer const &b, size_t m) {
+void big_integer::difference(big_integer const &b, size_t m) {
   int64_t borrow = 0;
-  uint64_t start = a.value.size() - m;
+  uint64_t start = value.size() - m;
   for (size_t i = 0; i < m; i++) {
-    int64_t diff = (int64_t)a.value[start + i] - (i < b.value.size() ? b.value[i] : 0) - borrow;
-    a.value[start + i] = (diff < 0 ? static_cast<uint32_t>(diff + 1 + UINT32_MAX) : diff);
+    int64_t diff = static_cast<int64_t>(value[start + i]) - (i < b.value.size() ? b.value[i] : 0) - borrow;
+    value[start + i] = (diff < 0 ? static_cast<uint32_t>(diff + 1 + UINT32_MAX) : diff);
     borrow = diff < 0;
   }
 }
@@ -235,7 +236,7 @@ big_integer operator/(big_integer a, big_integer const& b) {
   }
 
   if (b.value.size() == 1) {
-    big_integer::short_div(a, b.value[0]);
+    a.short_div(b.value[0]);
     a.sign = ans_sign;
     return a;
   }
@@ -250,15 +251,15 @@ big_integer operator/(big_integer a, big_integer const& b) {
   uint32_t qt = 0;
 
   for (size_t j = ans.value.size(); j != 0; j--) {
-    qt = big_integer::trial(a, divisor);
+    qt = a.trial(divisor);
     dq = divisor * qt;
 
-    if (big_integer::smaller(a, dq, m)) {
+    while (a.smaller(dq, m)) {
       qt--;
       dq -= divisor;
     }
     ans.value[j - 1] = qt;
-    big_integer::difference(a, dq, m);
+    a.difference(dq, m);
     a.value.pop_back();
   }
 
@@ -271,56 +272,53 @@ big_integer operator%(big_integer const& a, big_integer const& b) {
   return a - (a / b) * b;
 }
 
-void big_integer::additional_code(big_integer &a) {
-  for (uint32_t & cur : a.value){
+void big_integer::additional_code() {
+  for (uint32_t & cur : value){
     cur = UINT32_MAX - cur;
   }
 
-  a.sign = false;
-  a += 1;
+  sign = false;
+  *this += 1;
 }
 
-big_integer big_integer::binary_operation(big_integer &a, big_integer &b, uint32_t (*func)(uint32_t, uint32_t)) {
-  uint32_t new_sign = func(a.sign, b.sign);
+big_integer big_integer::binary_operation(big_integer b, uint32_t (*func)(uint32_t, uint32_t)) {
+  uint32_t new_sign = func(sign, b.sign);
 
-  while (a.value.size() < b.value.size()) {
-    a.value.push_back(0);
+  while (value.size() < b.value.size()) {
+    value.push_back(0);
   }
-  while (b.value.size() < a.value.size()) {
+  while (b.value.size() < value.size()) {
     b.value.push_back(0);
   }
-  if (a.sign) {
-    additional_code(a);
+  if (sign) {
+    additional_code();
   }
   if (b.sign) {
-    additional_code(b);
+    b.additional_code();
   }
 
-  for (size_t i = 0; i < a.value.size(); i++) {
-    a.value[i] = func(a.value[i], b.value[i]);
+  for (size_t i = 0; i < value.size(); i++) {
+    value[i] = func(value[i], b.value[i]);
   }
-  a.remove_zero();
+  remove_zero();
 
   if (new_sign) {
-    additional_code(a);
-    a.remove_zero();
+    additional_code();
+    remove_zero();
   }
-  a.sign = new_sign;
+  sign = new_sign;
 
-  return a;
+  return *this;
 }
 
 big_integer operator&(big_integer a, big_integer const& b) {
-  return big_integer::binary_operation((big_integer &) a, (big_integer &) b,
-      [] (uint32_t a, uint32_t b) { return a & b; });
+  return a.binary_operation(b,[] (uint32_t a, uint32_t b) { return a & b; });
 }
 big_integer operator|(big_integer a, big_integer const& b) {
-  return big_integer::binary_operation((big_integer &) a, (big_integer &) b,
-      [] (uint32_t a, uint32_t b) { return a | b; });
+  return a.binary_operation(b,[] (uint32_t a, uint32_t b) { return a | b; });
 }
 big_integer operator^(big_integer a, big_integer const& b) {
-  return big_integer::binary_operation((big_integer &) a, (big_integer &) b,
-      [] (uint32_t a, uint32_t b) { return a ^ b; });
+  return a.binary_operation(b,[] (uint32_t a, uint32_t b) { return a ^ b; });
 }
 
 big_integer operator<<(big_integer a, int b) {
@@ -412,7 +410,7 @@ std::string to_string(big_integer const &a) {
   big_integer tmp(a);
 
   while (tmp != 0) {
-    s.push_back((char) ((tmp % 10).value[0] + '0'));
+    s.push_back(static_cast<char> ((tmp % 10).value[0] + static_cast<uint32_t>('0')));
     tmp /= 10;
   }
   if (a.sign) {
@@ -427,7 +425,7 @@ std::ostream& operator<<(std::ostream& s, big_integer const& a) {
 }
 
 void big_integer::remove_zero() {
-  while (value.size() > 1 && !value.back()) {
+  while (value.size() > 1 && value.back() == 0) {
     value.pop_back();
   }
 }
