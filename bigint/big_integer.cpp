@@ -234,18 +234,10 @@ std::pair<big_integer, big_integer> big_integer::div_mod(big_integer const& b) {
   bool this_sign = sign;
 
   sign = b.sign;
-  if (!b.sign) {
-    if (b > *this) {
-      sign = this_sign;
-      this->normalize();
-      return {0, *this};
-    }
-  } else {
-    if (b < *this) {
-      sign = this_sign;
-      this->normalize();
-      return {0, *this};
-    }
+  if ((!b.sign && b > *this) || (b.sign && b < *this)) {
+    sign = this_sign;
+    this->normalize();
+    return {0, *this};
   }
 
   if (b.size() == 1) {
