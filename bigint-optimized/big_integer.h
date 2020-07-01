@@ -7,20 +7,7 @@
 
 #include <string>
 #include <utility>
-#include "small_vector.h"
-
-struct buffer {
-  size_t ref_counter;
-  small_vector<uint32_t> data;
-
-  ~buffer() = default;
-
-  buffer(size_t ref_counter, small_vector<uint32_t> const &data) :
-      ref_counter(ref_counter), data(data) {}
-
-  buffer(size_t ref_counter, uint32_t val, size_t n) :
-      ref_counter(ref_counter), data(val, n) {}
-};
+#include "buffer.h"
 
 struct big_integer {
   big_integer();
@@ -76,16 +63,27 @@ struct big_integer {
   friend std::string to_string(big_integer const& a);
 
  private:
-  bool sign;
-  buffer* shared;
+  buffer<uint32_t> value;
 
   big_integer(uint32_t value);
-  big_integer(uint32_t val, size_t n);
+  explicit big_integer(size_t n);
 
+  uint32_t& operator[](size_t i);
+  uint32_t operator[](size_t i) const;
+
+  bool& sign();
+  bool sign() const;
+
+  size_t& size();
   size_t size() const;
-  void data_push_back(uint32_t x);
-  uint32_t& get_elem(size_t i) const;
+
+  uint32_t& back();
+  uint32_t back() const;
+
+  void push_back(uint32_t x);
+  void pop_back();
   void remove_zero();
+  void reverse();
   void unshare();
 
   void short_div(uint32_t b);
