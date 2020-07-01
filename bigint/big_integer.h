@@ -43,8 +43,8 @@ struct big_integer {
   friend big_integer operator+(big_integer a, big_integer const& b);
   friend big_integer operator-(big_integer a, big_integer const& b);
   friend big_integer operator/(big_integer a, big_integer const& b);
-  friend big_integer operator*(big_integer const& a, big_integer const& b);
-  friend big_integer operator%(big_integer const& a, big_integer const& b);
+  friend big_integer operator*(big_integer a, big_integer const& b);
+  friend big_integer operator%(big_integer a, big_integer const& b);
 
   friend big_integer operator&(big_integer a, big_integer const& b);
   friend big_integer operator|(big_integer a, big_integer const& b);
@@ -63,13 +63,23 @@ struct big_integer {
   friend std::string to_string(big_integer const& a);
 
  private:
-  bool sign{};
+  bool sign;
   std::vector<uint32_t> value;
 
   big_integer(uint32_t value);
-  void remove_zero();
 
-  void short_div (uint32_t b);
+  std::pair<big_integer, big_integer> div_mod(big_integer const& b);
+  void normalize();
+  int32_t compare(big_integer const& b) const;
+  size_t size();
+  size_t size() const;
+  void pop_back();
+  void push_back(uint32_t a);
+
+  uint32_t& operator[](size_t i);
+  uint32_t const& operator[](size_t i) const;
+
+  big_integer short_div (uint32_t b);
   uint32_t trial(big_integer const &b);
   bool smaller(big_integer const &b, size_t m);
   void difference(big_integer const &b, size_t m);
@@ -80,8 +90,8 @@ struct big_integer {
 big_integer operator+(big_integer a, big_integer const& b);
 big_integer operator-(big_integer a, big_integer const& b);
 big_integer operator/(big_integer a, big_integer const& b);
-big_integer operator*(big_integer const& a, big_integer const& b);
-big_integer operator%(big_integer const& a, big_integer const& b);
+big_integer operator*(big_integer a, big_integer const& b);
+big_integer operator%(big_integer a, big_integer const& b);
 
 big_integer operator&(big_integer a, big_integer const& b);
 big_integer operator|(big_integer a, big_integer const& b);
