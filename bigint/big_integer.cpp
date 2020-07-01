@@ -188,7 +188,7 @@ big_integer operator*(big_integer a, big_integer const& b){
 }
 
 
-big_integer big_integer::short_div(uint32_t b) {
+uint32_t big_integer::short_div(uint32_t b) {
   uint64_t carry = 0;
   for (size_t i = size(); i != 0; i--) {
     uint64_t tmp = (carry << 32) + value[i - 1];
@@ -231,35 +231,37 @@ void big_integer::difference(big_integer const &b, size_t m) {
 
 std::pair<big_integer, big_integer> big_integer::div_mod(big_integer const& b) {
   bool ans_sign = sign ^ b.sign;
-  bool a_sign = sign;
+  bool this_sign = sign;
 
   sign = b.sign;
   if (!b.sign) {
     if (b > *this) {
-      sign = a_sign;
+      sign = this_sign;
       this->normalize();
       return {0, *this};
     }
   } else {
     if (b < *this) {
-      sign = a_sign;
+      sign = this_sign;
       this->normalize();
       return {0, *this};
     }
   }
 
   if (b.size() == 1) {
-    sign = ans_sign;
     big_integer sh = short_div(b[0]);
-    sh.sign = a_sign;
+    sign = ans_sign;
+    sh.sign = this_sign;
+
     this->normalize();
     sh.normalize();
+
     return {*this, sh};
   }
 
-  uint32_t normalize = (static_cast<uint64_t>(UINT32_MAX) + 1) / (static_cast<uint64_t>(b.value.back()) + 1);
-  *this *= normalize;
-  big_integer divisor = b * normalize;
+  uint32_t normalize_shift = (static_cast<uint64_t>(UINT32_MAX) + 1) / (static_cast<uint64_t>(b.value.back()) + 1);
+  *this *= normalize_shift;
+  big_integer divisor = b * normalize_shift;
   push_back(0);
   size_t m = divisor.size() + 1;
   big_integer ans, dq;
@@ -281,12 +283,9 @@ std::pair<big_integer, big_integer> big_integer::div_mod(big_integer const& b) {
 
   ans.sign = ans_sign;
   ans.normalize();
-  //sign = a_size;
 
-  this->normalize();
-  this->short_div(normalize);
-
-  sign = a_sign;
+  sign = this_sign;
+  this->short_div(normalize_shift);
   this->normalize();
 
   return {ans, *this};
@@ -309,7 +308,7 @@ void big_integer::additional_code() {
   *this += 1;
 }
 
-big_integer big_integer::binary_operation(big_integer b, uint32_t (*func)(uint32_t, uint32_t)) {
+big_integer big_integer::binary_operation(big_integer b, const std::function<uint32_t(uint32_t, uint32_t)>& func) {
   uint32_t new_sign = func(sign, b.sign);
 
   while (size() < b.size()) {

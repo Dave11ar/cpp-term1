@@ -68,9 +68,9 @@ struct big_integer {
 
   big_integer(uint32_t value);
 
-  std::pair<big_integer, big_integer> div_mod(big_integer const& b);
-  void normalize();
+
   int32_t compare(big_integer const& b) const;
+
   size_t size();
   size_t size() const;
   void pop_back();
@@ -79,12 +79,15 @@ struct big_integer {
   uint32_t& operator[](size_t i);
   uint32_t const& operator[](size_t i) const;
 
-  big_integer short_div (uint32_t b);
+  std::pair<big_integer, big_integer> div_mod(big_integer const& b);
+  void normalize();
+  uint32_t short_div (uint32_t b);
   uint32_t trial(big_integer const &b);
   bool smaller(big_integer const &b, size_t m);
   void difference(big_integer const &b, size_t m);
+
   void additional_code();
-  big_integer binary_operation(big_integer b, uint32_t (*func)(uint32_t, uint32_t));
+  big_integer binary_operation(big_integer b, const std::function<uint32_t(uint32_t, uint32_t)>&);
 };
 
 big_integer operator+(big_integer a, big_integer const& b);
