@@ -5,7 +5,7 @@
 #include "big_integer.h"
 #include <algorithm>
 
-big_integer::big_integer() : value(false, 1, 0) {}
+big_integer::big_integer() : value(false,0) {}
 
 big_integer::big_integer(size_t n) : big_integer() {
   for (size_t i = 1; i < n; i++) {
@@ -15,15 +15,15 @@ big_integer::big_integer(size_t n) : big_integer() {
 
 big_integer::big_integer(big_integer const &a) : value(a.value) {}
 
-big_integer::big_integer(int a) : value(a < 0, 1, static_cast<uint32_t>(a < 0 ? -static_cast<uint64_t>(a) :  a)) {}
+big_integer::big_integer(int a) : value(a < 0, static_cast<uint32_t>(a < 0 ? -static_cast<uint64_t>(a) :  a)) {}
 
-big_integer::big_integer(uint32_t a) : value(buffer<uint32_t>(false, 1, a)) {}
+big_integer::big_integer(uint32_t a) : value(buffer<uint32_t>(false, a)) {}
 
 big_integer::big_integer(std::string const &str) : big_integer() {
   if (str.empty() || str == "0" || str == "-0") {
     return;
   }
-  unshare();
+
   for (size_t digit = (str[0] == '-' || str[0] == '+'); digit < str.length(); digit++) {
     *this *= 10;
     *this += (str[digit] - '0');
@@ -40,12 +40,7 @@ big_integer& big_integer::operator=(big_integer const &a) {
     return *this;
   }
 
-  this->value.~buffer();
-  this->value = buffer<uint32_t>(a.value);
-  if (!value.small) {
-    value.shared_data->ref_counter++;
-  }
-
+  this->value = a.value;
   return *this;
 }
 
@@ -99,7 +94,6 @@ big_integer big_integer::operator-() const {
   }
 
   big_integer tmp(*this);
-  tmp.unshare();
   tmp.sign() = !tmp.sign();
   return tmp;
 }
@@ -129,8 +123,6 @@ big_integer big_integer::operator--(int) {
 }
 
 big_integer operator+(big_integer a, big_integer const& b) {
-  a.unshare();
-
   if (a.sign() == b.sign()) {
     uint64_t tmp, carry = 0;
 
@@ -169,8 +161,6 @@ big_integer operator-(big_integer a, big_integer const& b) {
     return -(b - a);
   }
   // a >= b > 0;
-  a.unshare();
-
 
   a.sign() = false;
   uint32_t carry = 0;
@@ -215,6 +205,7 @@ void big_integer::short_div(uint32_t b) {
   }
   remove_zero();
 }
+
 uint32_t big_integer::trial(big_integer const &b) {
   uint64_t dividend = (static_cast<uint64_t>((*this)[size() - 1]) << 32) |
       (static_cast<uint64_t>((*this)[size() - 2]));
@@ -246,7 +237,6 @@ void big_integer::difference(big_integer const &b, size_t m) {
 
 big_integer operator/(big_integer a, big_integer const& b) {
   bool ans_sign = a.sign() ^ b.sign();
-  a.unshare();
 
   a.sign() = b.sign();
   if (!b.sign()) {
@@ -365,6 +355,7 @@ big_integer operator<<(big_integer a, int b) {
 
   return a;
 }
+
 big_integer operator>>(big_integer a, int b) {
   if (b < 0) {
     return a << (-b);
@@ -469,7 +460,7 @@ uint32_t &big_integer::operator[](size_t i) {
   return value[i];
 }
 
-uint32_t big_integer::operator[](size_t i) const {
+uint32_t const& big_integer::operator[](size_t i) const {
   return value[i];
 }
 
@@ -485,29 +476,14 @@ bool& big_integer::sign() {
   return value.sign;
 }
 
-bool big_integer::sign() const {
-  return value.get_sign();
+bool const& big_integer::sign() const {
+  return value.sign;
 }
 
-size_t& big_integer::size() {
-  return value.size;
-}
-
-size_t big_integer::size() const{
+size_t const& big_integer::size() const{
   return value.get_size();
 }
 
-uint32_t& big_integer::back() {
+uint32_t const& big_integer::back() const{
   return value.back();
 }
-
-uint32_t big_integer::back() const{
-  return value.get_back();
-}
-
-void big_integer::unshare() {
-  if (!value.small) {
-    value.unshare();
-  }
-}
-
