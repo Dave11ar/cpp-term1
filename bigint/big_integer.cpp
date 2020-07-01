@@ -27,6 +27,7 @@ big_integer::big_integer(std::string const &str) : big_integer() {
   if (str[0] == '-') {
     sign = true;
   }
+  normalize();
 }
 
 big_integer::~big_integer() = default;
