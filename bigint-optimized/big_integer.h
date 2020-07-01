@@ -69,27 +69,22 @@ struct big_integer {
   explicit big_integer(size_t n);
 
   uint32_t& operator[](size_t i);
-  uint32_t operator[](size_t i) const;
-
   bool& sign();
-  bool sign() const;
-
-  size_t& size();
-  size_t size() const;
-
-  uint32_t& back();
-  uint32_t back() const;
-
   void push_back(uint32_t x);
   void pop_back();
   void remove_zero();
   void reverse();
-  void unshare();
+
+  uint32_t const& operator[](size_t i) const;
+  bool const& sign() const;
+  size_t const& size() const;
+  uint32_t const& back() const;
 
   void short_div(uint32_t b);
   uint32_t trial(big_integer const &b);
   bool smaller(big_integer const &b, size_t m);
   void difference(big_integer const &b, size_t m);
+
   void additional_code();
   big_integer binary_operation(big_integer const& b, uint32_t (*func)(uint32_t, uint32_t));
 };

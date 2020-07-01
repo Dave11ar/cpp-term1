@@ -21,9 +21,8 @@ struct shared_container {
 template <typename T>
 struct buffer {
   bool sign;
-  size_t size;
 
-  buffer(bool sign, size_t size, T a) : sign(sign), size(size), small(true) {
+  buffer(bool sign, T a) : sign(sign), size(1), small(true) {
     small_data[0] = a;
   }
 
@@ -50,23 +49,42 @@ struct buffer {
   }
 
   T& operator[](size_t i) {
+    if (small) {
+      return small_data[i];
+    } else {
+      unshare();
+      return shared_data->vec[i];
+    }
+  }
+
+  T const& operator[](size_t i) const {
     return small ? small_data[i] : shared_data->vec[i];
   }
 
-  T operator[](size_t i) const {
-    return small ? small_data[i] : shared_data->vec[i];
+  T const& back() const {
+    return small ? small_data[size - 1] : shared_data->vec.back();
   }
 
-  bool get_sign() const {
-    return sign;
-  }
-
-  size_t get_size() const {
+  size_t const& get_size() const {
     return size;
   }
 
-  T get_back() const {
-    return small ? small_data[size - 1] : shared_data->vec.back();
+  buffer& operator=(buffer const& a) {
+    this->~buffer();
+
+    sign = a.sign;
+    size = a.size;
+    small = a.small;
+    if (small) {
+      for (size_t i = 0; i < size; i++) {
+        small_data[i] = a.small_data[i];
+      }
+    } else {
+      shared_data = a.shared_data;
+      shared_data->ref_counter++;
+    }
+
+    return *this;
   }
 
   friend bool operator==(buffer const& a, buffer const& b) {
@@ -80,10 +98,6 @@ struct buffer {
       }
     }
     return true;
-  }
-
-  T& back() {
-    return small ? small_data[size - 1] : shared_data->vec.back();
   }
 
   void push_back(T a) {
@@ -146,13 +160,13 @@ struct buffer {
     }
   }
 
+ private:
+  size_t size;
   bool small;
   union {
     T small_data[MAX_SMALL];
     shared_container<T>* shared_data;
   };
- private:
-
 };
 
 #endif //BIGINT__BUFFER_H_
