@@ -5,62 +5,46 @@
 #include "big_integer.h"
 #include <algorithm>
 
-big_integer::big_integer() : sign(false) {
-  shared = new buffer(1, small_vector<uint32_t>(0, 1));
+big_integer::big_integer() : value(false, 1, 0) {}
+
+big_integer::big_integer(size_t n) : big_integer() {
+  for (size_t i = 1; i < n; i++) {
+    push_back(0);
+  }
 }
 
-big_integer::big_integer(uint32_t val, size_t n) : sign(false) {
-  shared = new buffer(1, small_vector<uint32_t>(val, n));
-}
+big_integer::big_integer(big_integer const &a) : value(a.value) {}
 
-big_integer::big_integer(big_integer const &a) : sign(a.sign) {
-  shared = a.shared;
-  shared->ref_counter++;
-}
+big_integer::big_integer(int a) : value(a < 0, 1, static_cast<uint32_t>(a < 0 ? -static_cast<uint64_t>(a) :  a)) {}
 
-big_integer::big_integer(int a) : sign(a < 0) {
-  shared = new buffer(1, static_cast<uint32_t>(a < 0 ? -static_cast<uint64_t>(a) :  a), 1);
-}
-
-big_integer::big_integer(uint32_t a) : sign(false) {
-  shared = new buffer(1, a, 1);
-}
+big_integer::big_integer(uint32_t a) : value(buffer<uint32_t>(false, 1, a)) {}
 
 big_integer::big_integer(std::string const &str) : big_integer() {
   if (str.empty() || str == "0" || str == "-0") {
     return;
   }
-
+  unshare();
   for (size_t digit = (str[0] == '-' || str[0] == '+'); digit < str.length(); digit++) {
     *this *= 10;
     *this += (str[digit] - '0');
   }
   if (str[0] == '-') {
-    sign = true;
+    sign() = true;
   }
 }
 
-big_integer::~big_integer() {
-  shared->ref_counter--;
-
-  if (shared->ref_counter == 0) {
-    delete shared;
-  }
-}
+big_integer::~big_integer() = default;
 
 big_integer& big_integer::operator=(big_integer const &a) {
   if (a == *this) {
     return *this;
   }
 
-  if (shared->ref_counter == 1) {
-    delete shared;
-  } else {
-    shared->ref_counter--;
+  this->value.~buffer();
+  this->value = buffer<uint32_t>(a.value);
+  if (!value.small) {
+    value.shared_data->ref_counter++;
   }
-  sign = a.sign;
-  shared = a.shared;
-  shared->ref_counter++;
 
   return *this;
 }
@@ -110,12 +94,13 @@ big_integer big_integer::operator+() const {
 }
 
 big_integer big_integer::operator-() const {
-  if (size() == 1 && !get_elem(0)) {
+  if (size() == 1 && !(*this)[0]) {
     return *this;
   }
 
   big_integer tmp(*this);
-  tmp.sign = !tmp.sign;
+  tmp.unshare();
+  tmp.sign() = !tmp.sign();
   return tmp;
 }
 
@@ -144,25 +129,25 @@ big_integer big_integer::operator--(int) {
 }
 
 big_integer operator+(big_integer a, big_integer const& b) {
-  if (a.sign == b.sign) {
-    a.unshare();
+  a.unshare();
 
+  if (a.sign() == b.sign()) {
     uint64_t tmp, carry = 0;
 
     size_t max_size = std::max(a.size(), b.size());
     for (size_t i = 0; i < max_size; i++) {
-      if (i == a.size()) a.data_push_back(0);
-      tmp = carry + a.get_elem(i) + (i < b.size() ? b.get_elem(i) : 0);
+      if (i == a.size()) a[0];
+      tmp = carry + a[i] + (i < b.size() ? b[i] : 0);
       carry = tmp > UINT32_MAX;
-      a.get_elem(i) = (uint32_t) (tmp & UINT32_MAX);
+      a[i] = (uint32_t) (tmp & UINT32_MAX);
     }
     if (carry > 0) {
-      a.data_push_back(carry);
+      a.push_back(carry);
     }
 
     return a;
   } else {
-    return (a.sign ? b - (-a) : a - (-b));
+    return (a.sign() ? b - (-a) : a - (-b));
   }
 }
 
@@ -174,10 +159,10 @@ big_integer operator-(big_integer a, big_integer const& b) {
     return a;
   }
 
-  if (a.sign != b.sign) {
-    return (a.sign ? -(-a + b) : a + -b);
+  if (a.sign() != b.sign()) {
+    return (a.sign() ? -(-a + b) : a + -b);
   }
-  if (a.sign) {
+  if (a.sign()) {
     return (-b - (-a));
   }
   if (a < b) {
@@ -186,13 +171,14 @@ big_integer operator-(big_integer a, big_integer const& b) {
   // a >= b > 0;
   a.unshare();
 
-  a.sign = false;
+
+  a.sign() = false;
   uint32_t carry = 0;
   int64_t tmp;
   for (size_t i = 0; i < a.size(); i++) {
-    tmp = (int64_t) a.get_elem(i) - carry - (i < b.size() ? b.get_elem(i) : 0);
+    tmp = (int64_t) a[i] - carry - (i < b.size() ? b[i] : 0);
     carry = tmp < 0;
-    a.get_elem(i) = tmp < 0 ? static_cast<uint32_t>(tmp + 1 + UINT32_MAX) : tmp;
+    a[i] = tmp < 0 ? static_cast<uint32_t>(tmp + 1 + UINT32_MAX) : tmp;
   }
   a.remove_zero();
 
@@ -204,16 +190,17 @@ big_integer operator*(big_integer a, big_integer const& b){
     return 0;
   }
 
-  big_integer res(0, a.size() + b.size());
-  res.sign = a.sign ^ b.sign;
+  big_integer res(a.size() + b.size());
+
+  res.sign() = a.sign() ^ b.sign();
   for (size_t i = 0; i < a.size(); i++) {
     uint64_t carry = 0;
     for (size_t j = 0; j < b.size(); j++) {
-      uint64_t tmp = (uint64_t) a.get_elem(i) * b.get_elem(j) + carry + res.get_elem(i + j);
-      res.get_elem(i + j) = static_cast<uint32_t>(tmp & UINT32_MAX);
+      uint64_t tmp = (uint64_t) a[i] * b[j] + carry + res[i + j];
+      res[i + j] = static_cast<uint32_t>(tmp & UINT32_MAX);
       carry = tmp >> 32;
     }
-    res.get_elem(i + b.size()) += carry;
+    res[i + b.size()] += carry;
   }
   res.remove_zero();
   return res;
@@ -222,24 +209,24 @@ big_integer operator*(big_integer a, big_integer const& b){
 void big_integer::short_div(uint32_t b) {
   uint64_t carry = 0;
   for (size_t i = size(); i != 0; i--) {
-    uint64_t tmp = (carry << 32) + get_elem(i - 1);
-    get_elem(i - 1) = tmp / b;
+    uint64_t tmp = (carry << 32) + (*this)[i - 1];
+    (*this)[i - 1] = tmp / b;
     carry = tmp % b;
   }
   remove_zero();
 }
 uint32_t big_integer::trial(big_integer const &b) {
-  uint64_t dividend = (static_cast<uint64_t>(get_elem(size() - 1)) << 32) |
-      (static_cast<uint64_t>(get_elem(size() - 2)));
-  uint64_t divider = static_cast<uint64_t>(b.get_elem(b.size() - 1));
+  uint64_t dividend = (static_cast<uint64_t>((*this)[size() - 1]) << 32) |
+      (static_cast<uint64_t>((*this)[size() - 2]));
+  uint64_t divider = static_cast<uint64_t>(b.back());
 
   return static_cast<uint32_t>((dividend / divider) & UINT32_MAX);
 }
 
 bool big_integer::smaller(big_integer const& b, size_t m) {
   for (size_t i = 1; i <= size(); i++) {
-    uint32_t x = get_elem(size() - i);
-    uint32_t y = (m - i < b.size() ? b.get_elem(m - i) : 0);
+    uint32_t x = (*this)[size() - i];
+    uint32_t y = (m - i < b.size() ? b[m - i] : 0);
     if (x != y) {
       return x < y;
     }
@@ -251,18 +238,18 @@ void big_integer::difference(big_integer const &b, size_t m) {
   int64_t borrow = 0;
   uint64_t start = size() - m;
   for (size_t i = 0; i < m; i++) {
-    int64_t diff = static_cast<int64_t>(get_elem(start + i)) - (i < b.size() ? b.get_elem(i) : 0) - borrow;
-    get_elem(start + i) = (diff < 0 ? static_cast<uint32_t>(diff + 1 + UINT32_MAX) : diff);
+    int64_t diff = static_cast<int64_t>((*this)[start + i]) - (i < b.size() ? b[i] : 0) - borrow;
+    (*this)[start + i] = (diff < 0 ? static_cast<uint32_t>(diff + 1 + UINT32_MAX) : diff);
     borrow = diff < 0;
   }
 }
 
 big_integer operator/(big_integer a, big_integer const& b) {
-  bool ans_sign = a.sign ^ b.sign;
-
+  bool ans_sign = a.sign() ^ b.sign();
   a.unshare();
-  a.sign = b.sign;
-  if (!b.sign) {
+
+  a.sign() = b.sign();
+  if (!b.sign()) {
     if (b > a) {
       return 0;
     }
@@ -272,18 +259,19 @@ big_integer operator/(big_integer a, big_integer const& b) {
     }
   }
 
+
   if (b.size() == 1) {
-    a.short_div(b.get_elem(0));
-    a.sign = ans_sign;
+    a.short_div(b[0]);
+    a.sign() = ans_sign;
     return a;
   }
 
-  uint32_t normalize = (static_cast<uint64_t>(UINT32_MAX) + 1) / (static_cast<uint64_t>(b.shared->data.back()) + 1);
+  uint32_t normalize = (static_cast<uint64_t>(UINT32_MAX) + 1) / (static_cast<uint64_t>(b.back()) + 1);
   a *= normalize;
-  big_integer divider = b * normalize;
-  a.data_push_back(0);
+  big_integer divider(b * normalize);
+  a.push_back(0);
   size_t m = divider.size() + 1;
-  big_integer ans(0, a.size() - divider.size()), dq;
+  big_integer ans(a.size() - divider.size()), dq;
   uint32_t qt = 0;
 
   for (size_t j = ans.size(); j != 0; j--) {
@@ -294,15 +282,14 @@ big_integer operator/(big_integer a, big_integer const& b) {
       qt--;
       dq -= divider;
     }
-    ans.get_elem(j - 1) = qt;
+    ans[j - 1] = qt;
 
     a.difference(dq, m);
-    a.shared->data.pop_back();
+    a.pop_back();
   }
 
   ans.remove_zero();
-  ans.sign = ans_sign;
-
+  ans.sign() = ans_sign;
   return ans;
 }
 
@@ -312,35 +299,33 @@ big_integer operator%(big_integer a, big_integer const& b) {
 
 void big_integer::additional_code() {
   for (size_t i = 0; i < size(); i++){
-    get_elem(i) = UINT32_MAX - get_elem(i);
+    (*this)[i] = UINT32_MAX - (*this)[i];
   }
 
-  sign = false;
+  sign() = false;
   *this += 1;
 }
 
 big_integer big_integer::binary_operation(big_integer const& b, uint32_t (*func)(uint32_t, uint32_t)) {
-  uint32_t new_sign = func(sign, b.sign);
+  uint32_t new_sign = func(sign(), b.sign());
 
   big_integer fir(*this), sec(b);
-  fir.unshare();
-  sec.unshare();
 
   while (fir.size() < sec.size()) {
-    fir.data_push_back(0);
+    fir.push_back(0);
   }
   while (sec.size() < fir.size()) {
-    sec.data_push_back(0);
+    sec.push_back(0);
   }
-  if (fir.sign) {
+  if (fir.sign()) {
     fir.additional_code();
   }
-  if (sec.sign) {
+  if (sec.sign()) {
     sec.additional_code();
   }
 
   for (size_t i = 0; i < fir.size(); i++) {
-    fir.get_elem(i) = func(fir.get_elem(i), sec.get_elem(i));
+    fir[i] = func(fir[i], sec[i]);
   }
   fir.remove_zero();
 
@@ -348,7 +333,7 @@ big_integer big_integer::binary_operation(big_integer const& b, uint32_t (*func)
     fir.additional_code();
     fir.remove_zero();
   }
-  fir.sign = new_sign;
+  fir.sign() = new_sign;
 
   return fir;
 }
@@ -368,17 +353,15 @@ big_integer operator<<(big_integer a, int b) {
     return a >> (-b);
   }
 
-  a.unshare();
-
   a *= (static_cast<uint32_t>(1) << (b % 32));
 
   uint32_t tmp = b / 32;
 
-  a.shared->data.reverse();
+  a.reverse();
   for (size_t i = 0; i < tmp; i++) {
-    a.data_push_back(0);
+    a.push_back(0);
   }
-  a.shared->data.reverse();
+  a.reverse();
 
   return a;
 }
@@ -387,30 +370,27 @@ big_integer operator>>(big_integer a, int b) {
     return a << (-b);
   }
 
-  a.unshare();
-
   a /= (static_cast<uint32_t>(1) << (b % 32));
 
   uint32_t tmp = b / 32;
 
-  a.shared->data.reverse();
+  a.reverse();
   for (size_t i = 0; i < tmp && a != 0; i++) {
-    a.shared->data.pop_back();
+    a.pop_back();
   }
-  a.shared->data.reverse();
+  a.reverse();
 
   if (a == 0) {
-    a.data_push_back(0);
-    a.sign = false;
+    a.push_back(0);
+    a.sign() = false;
   }
 
-  return a.sign ? a - 1 : a;
+  return a.sign() ? a - 1 : a;
 }
 
-bool operator==(big_integer const &a, big_integer const &b) {
+bool operator==(big_integer const& a, big_integer const& b) {
   return (a.size() == b.size() && a.size() == 1 &&
-      a.get_elem(0) == 0 && b.get_elem(0) == 0) ||
-      (a.sign == b.sign && a.shared->data == b.shared->data);
+      a[0] == 0 && b[0] == 0) || (a.value == b.value);
 }
 
 bool operator!=(big_integer const &a, big_integer const &b) {
@@ -418,10 +398,10 @@ bool operator!=(big_integer const &a, big_integer const &b) {
 }
 
 bool operator<(big_integer const &a, big_integer const &b) {
-  if (a.sign != b.sign) {
-    return a.sign;
+  if (a.sign() != b.sign()) {
+    return a.sign();
   }
-  if (a.sign) {
+  if (a.sign()) {
     return (-a > -b);
   }
 
@@ -430,10 +410,10 @@ bool operator<(big_integer const &a, big_integer const &b) {
   }
 
   for(size_t i = a.size(); i != 0; i--) {
-    if (a.get_elem(i - 1) > b.get_elem(i - 1)) {
+    if (a[i - 1] > b[i - 1]) {
       return false;
     }
-    if (a.get_elem(i - 1) < b.get_elem(i - 1)) {
+    if (a[i - 1] < b[i - 1]) {
       return true;
     }
   }
@@ -453,19 +433,18 @@ bool operator>=(big_integer const &a, big_integer const &b) {
 }
 
 std::string to_string(big_integer const& a) {
-  if (a.size() == 1 && a.get_elem(0) == 0) {
+  if (a.size() == 1 && a[0] == 0) {
     return "0";
   }
   std::string s;
   big_integer tmp(a);
-  tmp.unshare();
 
   while (tmp != 0) {
-    s.push_back(static_cast<char> ((tmp % 10).get_elem(0) + static_cast<uint32_t>('0')));
+    s.push_back(static_cast<char> ((tmp % 10)[0] + static_cast<uint32_t>('0')));
     tmp /= 10;
   }
 
-  if (a.sign) {
+  if (a.sign()) {
     s.push_back('-');
   }
   std::reverse(s.begin(), s.end());
@@ -477,30 +456,58 @@ std::ostream& operator<<(std::ostream& s, big_integer const& a) {
 }
 
 void big_integer::remove_zero() {
-  while (size() > 1 && shared->data.back() == 0) {
-    shared->data.pop_back();
+  while (size() > 1 && back() == 0) {
+    pop_back();
   }
+}
+
+void big_integer::push_back(uint32_t x) {
+  value.push_back(x);
+}
+
+uint32_t &big_integer::operator[](size_t i) {
+  return value[i];
+}
+
+uint32_t big_integer::operator[](size_t i) const {
+  return value[i];
+}
+
+void big_integer::pop_back() {
+  value.pop_back();
+}
+
+void big_integer::reverse() {
+  value.reverse();
+}
+
+bool& big_integer::sign() {
+  return value.sign;
+}
+
+bool big_integer::sign() const {
+  return value.get_sign();
+}
+
+size_t& big_integer::size() {
+  return value.size;
+}
+
+size_t big_integer::size() const{
+  return value.get_size();
+}
+
+uint32_t& big_integer::back() {
+  return value.back();
+}
+
+uint32_t big_integer::back() const{
+  return value.get_back();
 }
 
 void big_integer::unshare() {
-  if (shared->ref_counter == 1) {
-    return;
+  if (!value.small) {
+    value.unshare();
   }
-
-  shared->ref_counter--;
-  shared = new buffer(1, shared->data);
 }
-
-size_t big_integer::size() const {
-  return shared->data.size();
-}
-
-void big_integer::data_push_back(uint32_t x) {
-  shared->data.push_back(x);
-}
-
-uint32_t& big_integer::get_elem(size_t i) const {
-  return shared->data[i];
-}
-
 
