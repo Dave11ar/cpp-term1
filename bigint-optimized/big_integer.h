@@ -7,6 +7,7 @@
 
 #include <string>
 #include <utility>
+#include <functional>
 #include "buffer.h"
 
 struct big_integer {
@@ -72,21 +73,23 @@ struct big_integer {
   bool& sign();
   void push_back(uint32_t x);
   void pop_back();
-  void remove_zero();
+  void normalize();
   void reverse();
 
+  int32_t compare(big_integer const& b) const;
   uint32_t const& operator[](size_t i) const;
   bool const& sign() const;
-  size_t const& size() const;
+  size_t size() const;
   uint32_t const& back() const;
 
-  void short_div(uint32_t b);
+  std::pair<big_integer, big_integer> div_mod(big_integer const& b);
+  uint32_t short_div(uint32_t b);
   uint32_t trial(big_integer const &b);
   bool smaller(big_integer const &b, size_t m);
   void difference(big_integer const &b, size_t m);
 
   void additional_code();
-  big_integer binary_operation(big_integer const& b, uint32_t (*func)(uint32_t, uint32_t));
+  big_integer binary_operation(big_integer const& b, const std::function<uint32_t(uint32_t, uint32_t)>& func);
 };
 
 std::string to_string(big_integer const& a);
