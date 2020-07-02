@@ -5,7 +5,7 @@
 #include "big_integer.h"
 #include <algorithm>
 
-big_integer::big_integer() : value(false,0) {}
+big_integer::big_integer() : sign(false), value(0) {}
 
 big_integer::big_integer(size_t n) : big_integer() {
   for (size_t i = 1; i < n; i++) {
@@ -13,11 +13,11 @@ big_integer::big_integer(size_t n) : big_integer() {
   }
 }
 
-big_integer::big_integer(big_integer const &a) : value(a.value) {}
+big_integer::big_integer(big_integer const &a) : sign(a.sign), value(a.value) {}
 
-big_integer::big_integer(int a) : value(a < 0, static_cast<uint32_t>(a < 0 ? -static_cast<uint64_t>(a) :  a)) {}
+big_integer::big_integer(int a) : sign(a < 0) ,value(static_cast<uint32_t>(a < 0 ? -static_cast<uint64_t>(a) :  a)) {}
 
-big_integer::big_integer(uint32_t a) : value(buffer<uint32_t>(false, a)) {}
+big_integer::big_integer(uint32_t a) : sign(false), value(buffer<uint32_t>(a)) {}
 
 big_integer::big_integer(std::string const &str) : big_integer() {
   if (str.empty() || str == "0" || str == "-0") {
@@ -29,7 +29,7 @@ big_integer::big_integer(std::string const &str) : big_integer() {
     *this += (str[digit] - '0');
   }
   if (str[0] == '-') {
-    sign() = true;
+    sign = true;
   }
   normalize();
 }
@@ -41,7 +41,8 @@ big_integer& big_integer::operator=(big_integer const &a) {
     return *this;
   }
 
-  this->value = a.value;
+  value = a.value;
+  sign = a.sign;
   return *this;
 }
 
@@ -95,7 +96,7 @@ big_integer big_integer::operator-() const {
   }
 
   big_integer tmp(*this);
-  tmp.sign() = !tmp.sign();
+  tmp.sign = !tmp.sign;
   tmp.normalize();
   return tmp;
 }
@@ -125,7 +126,7 @@ big_integer big_integer::operator--(int) {
 }
 
 big_integer operator+(big_integer a, big_integer const& b) {
-  if (a.sign() == b.sign()) {
+  if (a.sign == b.sign) {
     uint64_t tmp, carry = 0;
 
     size_t max_size = std::max(a.size(), b.size());
@@ -142,7 +143,7 @@ big_integer operator+(big_integer a, big_integer const& b) {
     a.normalize();
     return a;
   } else {
-    return (a.sign() ? b - (-a) : a - (-b));
+    return (a.sign ? b - (-a) : a - (-b));
   }
 }
 
@@ -154,10 +155,10 @@ big_integer operator-(big_integer a, big_integer const& b) {
     return a;
   }
 
-  if (a.sign() != b.sign()) {
-    return (a.sign() ? -(-a + b) : a + -b);
+  if (a.sign != b.sign) {
+    return (a.sign ? -(-a + b) : a + -b);
   }
-  if (a.sign()) {
+  if (a.sign) {
     return (-b - (-a));
   }
   if (a < b) {
@@ -165,7 +166,7 @@ big_integer operator-(big_integer a, big_integer const& b) {
   }
   // a >= b > 0;
 
-  a.sign() = false;
+  a.sign = false;
   uint32_t carry = 0;
   int64_t tmp;
   for (size_t i = 0; i < a.size(); i++) {
@@ -185,7 +186,7 @@ big_integer operator*(big_integer a, big_integer const& b){
 
   big_integer res(a.size() + b.size());
 
-  res.sign() = a.sign() ^ b.sign();
+  res.sign = a.sign ^ b.sign;
   for (size_t i = 0; i < a.size(); i++) {
     uint64_t carry = 0;
     for (size_t j = 0; j < b.size(); j++) {
@@ -242,20 +243,20 @@ void big_integer::difference(big_integer const &b, size_t m) {
 }
 
 std::pair<big_integer, big_integer> big_integer::div_mod(big_integer const &b) {
-  bool ans_sign = sign() ^ b.sign();
-  bool this_sign = sign();
+  bool ans_sign = sign ^ b.sign;
+  bool this_sign = sign;
 
-  sign() = b.sign();
-  if ((!b.sign() && b > *this) || (b.sign() && b < *this)) {
-    sign() = this_sign;
+  sign = b.sign;
+  if ((!b.sign && b > *this) || (b.sign && b < *this)) {
+    sign = this_sign;
     this->normalize();
     return {0, *this};
   }
 
   if (b.size() == 1) {
     big_integer sh = short_div(b[0]);
-    sign() = ans_sign;
-    sh.sign() = this_sign;
+    sign = ans_sign;
+    sh.sign = this_sign;
 
     this->normalize();
     sh.normalize();
@@ -285,10 +286,10 @@ std::pair<big_integer, big_integer> big_integer::div_mod(big_integer const &b) {
     pop_back();
   }
 
-  ans.sign() = ans_sign;
+  ans.sign = ans_sign;
   ans.normalize();
 
-  sign() = this_sign;
+  sign = this_sign;
   this->short_div(normalize_shift);
   this->normalize();
 
@@ -308,12 +309,12 @@ void big_integer::additional_code() {
     (*this)[i] = UINT32_MAX - (*this)[i];
   }
 
-  sign() = false;
+  sign = false;
   *this += 1;
 }
 
 big_integer big_integer::binary_operation(big_integer const& b, const std::function<uint32_t(uint32_t, uint32_t)>& func) {
-  uint32_t new_sign = func(sign(), b.sign());
+  uint32_t new_sign = func(sign, b.sign);
 
   big_integer fir(*this), sec(b);
 
@@ -323,10 +324,10 @@ big_integer big_integer::binary_operation(big_integer const& b, const std::funct
   while (sec.size() < fir.size()) {
     sec.push_back(0);
   }
-  if (fir.sign()) {
+  if (fir.sign) {
     fir.additional_code();
   }
-  if (sec.sign()) {
+  if (sec.sign) {
     sec.additional_code();
   }
 
@@ -339,7 +340,7 @@ big_integer big_integer::binary_operation(big_integer const& b, const std::funct
     fir.additional_code();
     fir.normalize();
   }
-  fir.sign() = new_sign;
+  fir.sign = new_sign;
 
   return fir;
 }
@@ -390,30 +391,30 @@ big_integer operator>>(big_integer a, int b) {
 
   if (a == 0) {
     a.push_back(0);
-    a.sign() = false;
+    a.sign = false;
   }
 
   a.normalize();
-  return a.sign() ? a - 1 : a;
+  return a.sign ? a - 1 : a;
 }
 int32_t big_integer::compare(big_integer const& b) const {
-  if (sign() != b.sign()) {
-    return sign() ? -1 : 1;
+  if (sign != b.sign) {
+    return sign ? -1 : 1;
   }
 
   if (size() > b.size()) {
-    return sign() ? -1 : 1;
+    return sign ? -1 : 1;
   }
   if (size() < b.size()) {
-    return sign() ? 1 : -1;
+    return sign ? 1 : -1;
   }
 
   for (size_t i = size(); i > 0; i--) {
     if (value[i - 1] > b[i - 1]) {
-      return sign() ? -1 : 1;
+      return sign ? -1 : 1;
     }
     if (value[i - 1] < b[i - 1]) {
-      return sign() ? 1 : -1;
+      return sign ? 1 : -1;
     }
   }
 
@@ -456,7 +457,7 @@ std::string to_string(big_integer const& a) {
     tmp /= 10;
   }
 
-  if (a.sign()) {
+  if (a.sign) {
     s.push_back('-');
   }
   std::reverse(s.begin(), s.end());
@@ -473,7 +474,7 @@ void big_integer::normalize() {
   }
 
   if (size() == 1 && value[0] == 0) {
-    sign() = false;
+    sign = false;
   }
 }
 
@@ -495,14 +496,6 @@ void big_integer::pop_back() {
 
 void big_integer::reverse() {
   value.reverse();
-}
-
-bool& big_integer::sign() {
-  return value.sign;
-}
-
-bool const& big_integer::sign() const {
-  return value.sign;
 }
 
 size_t big_integer::size() const{

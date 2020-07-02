@@ -11,13 +11,11 @@ template <typename T>
 struct buffer {
   static constexpr size_t MAX_SMALL = 2;
 
-  bool sign;
-
-  buffer(bool sign, T a) : sign(sign), size(1), small(true) {
+  explicit buffer(T a) : size(1), small(true) {
     small_data[0] = a;
   }
 
-  buffer(buffer const& a) : sign(a.sign), size(a.size), small(a.small) {
+  buffer(buffer const& a) : size(a.size), small(a.small) {
     if (small) {
       for (size_t i = 0; i < size; i++) {
         small_data[i] = a.small_data[i];
@@ -29,8 +27,10 @@ struct buffer {
   }
 
   ~buffer() {
-    if (!small && shared_data->unique()) {
-      delete shared_data;
+    if (small) {
+      destruct_small();
+    } else {
+      shared_data->clear_mem();
     }
   }
 
@@ -70,24 +70,25 @@ struct buffer {
       } else {
         shared_container<T>* tmp = shared_data;
         std::copy(a.small_data, a.small_data + a.size, small_data);
+        a.destruct_small();
         a.shared_data = tmp;
       }
     } else {
       if (small) {
         shared_container<T>* tmp = a.shared_data;
         std::copy(small_data, small_data + size, a.small_data);
+        destruct_small();
         shared_data = tmp;
       } else {
         swap(shared_data, a.shared_data);
       }
     }
     swap(small, a.small);
-    swap(sign, a.sign);
     swap(size, a.size);
   }
 
   friend bool operator==(buffer const& a, buffer const& b) {
-    if (a.size != b.size || a.sign != b.sign) {
+    if (a.size != b.size) {
       return false;
     }
 
@@ -106,8 +107,10 @@ struct buffer {
 
         std::vector<T> tmp(small_data, small_data + size);
         tmp.push_back(a);
+        shared_container<T>* g_tmp = new shared_container<T>(tmp);
+        destruct_small();
 
-        shared_data = new shared_container<T>(tmp);
+        shared_data = g_tmp;
       } else {
         small_data[size] = a;
       }
@@ -138,8 +141,12 @@ struct buffer {
   }
 
   void unshare() {
-    if (!shared_data->unique()) {
-      shared_data = new shared_container<T>(*shared_data);
+    shared_data = shared_data->make_unique();
+  }
+
+  void destruct_small() {
+    for (size_t i = size; i > 0; i--) {
+      small_data[i - 1].~T();
     }
   }
 
