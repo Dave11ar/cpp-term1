@@ -8,27 +8,26 @@
 #include <vector>
 #include <algorithm>
 
-template <typename T>
 struct shared_container {
   ~shared_container()  = default;
 
-  explicit shared_container(std::vector<T> const& a) : ref_counter(1), vec(a) {}
-  shared_container(shared_container<T> const& a) : ref_counter(1), vec(a.vec) {}
+  explicit shared_container(std::vector<uint32_t> const& a) : ref_counter(1), vec(a) {}
+  shared_container(shared_container const& a) : ref_counter(1), vec(a.vec) {}
 
   bool unique() {
     return ref_counter == 1;
   }
 
-  shared_container<T>* make_unique() {
+  shared_container* make_unique() {
     if (unique()) {
       return this;
     } else {
       ref_counter--;
-      return new shared_container<T>(*this);
+      return new shared_container(*this);
     }
   }
 
-  void clear_mem() {
+  void delete_instance() {
     if (unique()) {
       delete this;
     } else {
@@ -44,19 +43,19 @@ struct shared_container {
     vec.pop_back();
   }
 
-  void push_back(T a) {
+  void push_back(uint32_t a) {
     vec.push_back(a);
   }
 
-  T const& back() const {
+  uint32_t const& back() const {
     return vec.back();
   }
 
-  T& operator[](size_t i) {
+  uint32_t & operator[](size_t i) {
     return vec[i];
   }
 
-  T const& operator[](size_t i) const {
+  uint32_t const& operator[](size_t i) const {
     return vec[i];
   }
 
@@ -66,7 +65,7 @@ struct shared_container {
 
  private:
   size_t ref_counter;
-  std::vector<T> vec;
+  std::vector<uint32_t> vec;
 };
 
 #endif //BIGINT__SHARED_CONTAINER_H_

@@ -7,19 +7,16 @@
 
 #include "shared_container.h"
 
-template <typename T>
 struct buffer {
   static constexpr size_t MAX_SMALL = 2;
 
-  explicit buffer(T a) : size(1), small(true) {
+  explicit buffer(uint32_t a) : size(1), small(true) {
     small_data[0] = a;
   }
 
   buffer(buffer const& a) : size(a.size), small(a.small) {
     if (small) {
-      for (size_t i = 0; i < size; i++) {
-        small_data[i] = a.small_data[i];
-      }
+      std::copy(a.small_data, a.small_data + a.size, small_data);
     } else {
       shared_data = a.shared_data;
       shared_data->increase_ref();
@@ -27,14 +24,12 @@ struct buffer {
   }
 
   ~buffer() {
-    if (small) {
-      destruct_small();
-    } else {
-      shared_data->clear_mem();
+    if (!small) {
+      shared_data->delete_instance();
     }
   }
 
-  T& operator[](size_t i) {
+  uint32_t& operator[](size_t i) {
     if (small) {
       return small_data[i];
     } else {
@@ -43,11 +38,11 @@ struct buffer {
     }
   }
 
-  T const& operator[](size_t i) const {
+  uint32_t const& operator[](size_t i) const {
     return small ? small_data[i] : (*shared_data)[i];
   }
 
-  T const& back() const {
+  uint32_t const& back() const {
     return small ? small_data[size - 1] : shared_data->back();
   }
 
@@ -56,35 +51,20 @@ struct buffer {
   }
 
   buffer& operator=(buffer const& a) {
-    buffer tmp(a);
-    swap(tmp);
-    return *this;
-  }
-
-  void swap(buffer& a) {
-    using std::swap;
-
-    if (a.small) {
-      if (small) {
-        swap(small_data, a.small_data);
-      } else {
-        shared_container<T>* tmp = shared_data;
-        std::copy(a.small_data, a.small_data + a.size, small_data);
-        a.destruct_small();
-        a.shared_data = tmp;
-      }
-    } else {
-      if (small) {
-        shared_container<T>* tmp = a.shared_data;
-        std::copy(small_data, small_data + size, a.small_data);
-        destruct_small();
-        shared_data = tmp;
-      } else {
-        swap(shared_data, a.shared_data);
-      }
+    if (*this == a) {
+      return *this;
     }
-    swap(small, a.small);
-    swap(size, a.size);
+
+    this->~buffer();
+    size = a.size;
+    small = a.small;
+    if (a.small) {
+      std::copy(a.small_data, a.small_data + a.size, small_data);
+    } else {
+      shared_data = new shared_container(*a.shared_data);
+    }
+
+    return *this;
   }
 
   friend bool operator==(buffer const& a, buffer const& b) {
@@ -100,17 +80,14 @@ struct buffer {
     return true;
   }
 
-  void push_back(T a) {
+  void push_back(uint32_t a) {
     if (small) {
       if (size == MAX_SMALL) {
         small = false;
 
-        std::vector<T> tmp(small_data, small_data + size);
+        std::vector<uint32_t> tmp(small_data, small_data + size);
         tmp.push_back(a);
-        shared_container<T>* g_tmp = new shared_container<T>(tmp);
-        destruct_small();
-
-        shared_data = g_tmp;
+        shared_data = new shared_container(tmp);
       } else {
         small_data[size] = a;
       }
@@ -122,9 +99,7 @@ struct buffer {
   }
 
   void pop_back() {
-    if (small) {
-      small_data[size - 1].~T();
-    } else {
+    if (!small) {
       unshare();
       shared_data->pop_back();
     }
@@ -144,18 +119,12 @@ struct buffer {
     shared_data = shared_data->make_unique();
   }
 
-  void destruct_small() {
-    for (size_t i = size; i > 0; i--) {
-      small_data[i - 1].~T();
-    }
-  }
-
  private:
   size_t size;
   bool small;
   union {
-    T small_data[MAX_SMALL];
-    shared_container<T>* shared_data;
+    uint32_t small_data[MAX_SMALL];
+    shared_container* shared_data;
   };
 };
 
