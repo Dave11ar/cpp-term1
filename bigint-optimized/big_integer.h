@@ -63,6 +63,7 @@ struct big_integer {
 
   friend std::string to_string(big_integer const& a);
 
+  bool sign;
  private:
   buffer<uint32_t> value;
 
@@ -70,7 +71,6 @@ struct big_integer {
   explicit big_integer(size_t n);
 
   uint32_t& operator[](size_t i);
-  bool& sign();
   void push_back(uint32_t x);
   void pop_back();
   void normalize();
@@ -78,7 +78,6 @@ struct big_integer {
 
   int32_t compare(big_integer const& b) const;
   uint32_t const& operator[](size_t i) const;
-  bool const& sign() const;
   size_t size() const;
   uint32_t const& back() const;
 

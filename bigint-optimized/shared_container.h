@@ -16,11 +16,23 @@ struct shared_container {
   shared_container(shared_container<T> const& a) : ref_counter(1), vec(a.vec) {}
 
   bool unique() {
-    if (ref_counter != 1) {
-      ref_counter--;
-      return false;
+    return ref_counter == 1;
+  }
+
+  shared_container<T>* make_unique() {
+    if (unique()) {
+      return this;
     } else {
-      return true;
+      ref_counter--;
+      return new shared_container<T>(*this);
+    }
+  }
+
+  void clear_mem() {
+    if (unique()) {
+      delete this;
+    } else {
+      ref_counter--;
     }
   }
 
