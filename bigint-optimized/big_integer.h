@@ -65,7 +65,7 @@ struct big_integer {
 
   bool sign;
  private:
-  buffer<uint32_t> value;
+  buffer value;
 
   big_integer(uint32_t value);
   explicit big_integer(size_t n);

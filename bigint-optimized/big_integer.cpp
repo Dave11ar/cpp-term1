@@ -17,7 +17,7 @@ big_integer::big_integer(big_integer const &a) : sign(a.sign), value(a.value) {}
 
 big_integer::big_integer(int a) : sign(a < 0) ,value(static_cast<uint32_t>(a < 0 ? -static_cast<uint64_t>(a) :  a)) {}
 
-big_integer::big_integer(uint32_t a) : sign(false), value(buffer<uint32_t>(a)) {}
+big_integer::big_integer(uint32_t a) : sign(false), value(buffer(a)) {}
 
 big_integer::big_integer(std::string const &str) : big_integer() {
   if (str.empty() || str == "0" || str == "-0") {
@@ -384,15 +384,10 @@ big_integer operator>>(big_integer a, int b) {
   uint32_t tmp = b / 32;
 
   a.reverse();
-  for (size_t i = 0; i < tmp && a != 0; i++) {
+  for (size_t i = 0; i < tmp; i++) {
     a.pop_back();
   }
   a.reverse();
-
-  if (a == 0) {
-    a.push_back(0);
-    a.sign = false;
-  }
 
   a.normalize();
   return a.sign ? a - 1 : a;
@@ -469,6 +464,10 @@ std::ostream& operator<<(std::ostream& s, big_integer const& a) {
 }
 
 void big_integer::normalize() {
+  if (size() == 0) {
+    push_back(0);
+  }
+
   while (size() > 1 && back() == 0) {
     pop_back();
   }
