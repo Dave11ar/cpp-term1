@@ -159,7 +159,7 @@ big_integer operator-(big_integer a, big_integer const& b) {
   for (size_t i = 0; i < a.value.size(); i++) {
     tmp = static_cast<int64_t>(a[i]) - carry - (i < b.size() ? b[i] : 0);
     carry = tmp < 0;
-    a[i] = tmp < 0 ? static_cast<uint32_t>(tmp + 1 + UINT32_MAX) : tmp;
+    a[i] = tmp < 0 ? tmp + 1 + UINT32_MAX : tmp;
   }
   a.normalize();
 
@@ -178,7 +178,7 @@ big_integer operator*(big_integer a, big_integer const& b){
     uint64_t carry = 0;
     for (size_t j = 0; j < b.size(); j++) {
       uint64_t tmp = static_cast<uint64_t>(a[i]) * b[j] + carry + res[i + j];
-      res[i + j] = static_cast<uint32_t>(tmp & UINT32_MAX);
+      res[i + j] = tmp & UINT32_MAX;
       carry = tmp >> 32;
     }
     res[i + b.size()] += carry;
@@ -198,7 +198,7 @@ uint32_t big_integer::short_div(uint32_t b) {
   }
   normalize();
 
-  return static_cast<uint32_t>(carry);
+  return carry;
 }
 
 uint32_t big_integer::trial(big_integer const &b) {
@@ -206,7 +206,7 @@ uint32_t big_integer::trial(big_integer const &b) {
       (static_cast<uint64_t>(value[size() - 2]));
   uint64_t divider = b.value.back();
 
-  return static_cast<uint32_t>((dividend / divider) & UINT32_MAX);
+  return (dividend / divider) & UINT32_MAX;
 }
 
 bool big_integer::smaller(big_integer const &b, size_t m) {
@@ -225,7 +225,7 @@ void big_integer::difference(big_integer const &b, size_t m) {
   uint64_t start = size() - m;
   for (size_t i = 0; i < m; i++) {
     int64_t diff = static_cast<int64_t>(value[start + i]) - (i < b.size() ? b[i] : 0) - borrow;
-    value[start + i] = (diff < 0 ? static_cast<uint32_t>(diff + 1 + UINT32_MAX) : diff);
+    value[start + i] = (diff < 0 ? diff + 1 + UINT32_MAX : diff);
     borrow = diff < 0;
   }
 }
@@ -348,13 +348,9 @@ big_integer operator<<(big_integer a, int b) {
 
   a *= (static_cast<uint32_t>(1) << (b % 32));
 
-  uint32_t tmp = b / 32;
+  size_t tmp = b / 32;
 
-  reverse(a.value.begin(), a.value.end());
-  for (size_t i = 0; i < tmp; i++) {
-    a.push_back(0);
-  }
-  reverse(a.value.begin(), a.value.end());
+  a.value.insert(a.value.begin(), tmp, 0);
 
   a.normalize();
   return a;
@@ -367,13 +363,9 @@ big_integer operator>>(big_integer a, int b) {
 
   a /= (static_cast<uint32_t>(1) << (b % 32));
 
-  uint32_t tmp = b / 32;
+  size_t tmp = b / 32;
 
-  reverse(a.value.begin(), a.value.end());
-  for (size_t i = 0; i < tmp && !a.value.empty(); i++) {
-    a.pop_back();
-  }
-  reverse(a.value.begin(), a.value.end());
+  a.value.erase(a.value.begin(), a.value.begin() + std::min(tmp, a.size()));
 
   if (a.value.empty()) {
     a.push_back(0);
@@ -452,10 +444,6 @@ std::string to_string(big_integer const &a) {
 
 std::ostream& operator<<(std::ostream& s, big_integer const& a) {
   return s << to_string(a);
-}
-
-size_t big_integer::size() {
-  return value.size();
 }
 
 uint32_t &big_integer::operator[](size_t i) {

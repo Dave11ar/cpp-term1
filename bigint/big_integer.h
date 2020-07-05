@@ -71,7 +71,6 @@ struct big_integer {
 
   int32_t compare(big_integer const& b) const;
 
-  size_t size();
   size_t size() const;
   void pop_back();
   void push_back(uint32_t a);
